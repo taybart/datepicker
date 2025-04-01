@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -19,10 +20,20 @@ var (
 		About:   "TUI date picker",
 		Args: map[string]*args.Arg{
 			// TODO: this
-			"startSunday": {
+			"sunday": {
 				Short:   "s",
 				Help:    "Start week on sunday",
 				Default: false,
+			},
+			"full": {
+				Short:   "f",
+				Help:    "fullscreen prompt",
+				Default: false,
+			},
+			"prompt": {
+				Short:   "p",
+				Help:    "title of the calendar prompt",
+				Default: "",
 			},
 			"output": {
 				Short:   "o",
@@ -35,6 +46,7 @@ var (
 
 type model struct {
 	selected bool
+	prompt   string
 	cal      Calendar
 	keys     KeyMap
 	help     help.Model
@@ -92,17 +104,46 @@ func (m model) View() string {
 	if m.selected {
 		return "" // clear output
 	}
+	var s strings.Builder
 
-	s := lipgloss.NewStyle().
+	if m.prompt != "" {
+		prompt := m.prompt
+		if len(prompt) < 20 {
+			padLen := 20 - len(prompt)
+			prompt = fmt.Sprintf("%s%s%s",
+				strings.Repeat(" ", (padLen+1)/2),
+				prompt,
+				strings.Repeat(" ", (padLen+1)/2),
+			)
+
+		}
+		s.WriteString(lipgloss.NewStyle().
+			Bold(true).
+			Underline(true).
+			Foreground(lipgloss.Color("10")).
+			Render(prompt))
+		s.WriteString("\n")
+	}
+
+	s.WriteString(lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("5")).
-		Render(fmt.Sprintf("   %s %d\nMo Tu We Th Fr Sa Su", m.cal.Month(), m.cal.Year())) + "\n"
-
-	monthMap := m.cal.Map()
-	for _, week := range monthMap {
+		Render(fmt.Sprintf("   %s %d", m.cal.Month(), m.cal.Year())))
+	s.WriteString("\n")
+	weekHeader := "Mo Tu We Th Fr Sa Su"
+	if m.cal.startSunday {
+		weekHeader = "Su Mo Tu We Th Fr Sa"
+	}
+	s.WriteString(lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("5")).
+		Render(weekHeader))
+	s.WriteString("\n")
+	month := m.cal.Map()
+	for _, week := range month {
 		for k, day := range week {
 			if day == 0 {
-				s += "   "
+				s.WriteString("   ")
 				continue
 			}
 
@@ -129,19 +170,19 @@ func (m model) View() string {
 					style = style.Foreground(lipgloss.Color("3"))
 				}
 			}
-			s += style.Render(fmt.Sprintf("%2d ", day))
+			s.WriteString(style.Render(fmt.Sprintf("%2d ", day)))
 		}
 
-		s += "\n"
+		s.WriteString("\n")
 	}
 
-	if len(monthMap) == 4 {
-		s += "\n\n"
-	} else if len(monthMap) == 5 {
-		s += "\n"
+	if len(month) == 4 {
+		s.WriteString("\n\n")
+	} else if len(month) == 5 {
+		s.WriteString("\n")
 	}
-	s += m.help.View(m.keys)
-	return s
+	s.WriteString(m.help.View(m.keys))
+	return s.String()
 }
 
 func run() error {
@@ -151,16 +192,25 @@ func run() error {
 
 	cal := NewCalendar()
 	cal.SetOutputFormat(app.String("output"))
+	if app.True("sunday") {
+		cal.SundayStart()
+	}
 
 	// tmp fix for lipgloss not detecting color output
 	os.Setenv("CLICOLOR_FORCE", "true")
 
+	opts := []tea.ProgramOption{tea.WithOutput(os.Stderr)}
+	if app.True("full") {
+		opts = append(opts, tea.WithAltScreen())
+	}
+
 	tm, err := tea.NewProgram(model{
 		selected: false,
+		prompt:   app.String("prompt"),
 		cal:      cal,
 		keys:     Keys,
 		help:     help.New(),
-	}, tea.WithOutput(os.Stderr)).Run()
+	}, opts...).Run()
 	if err != nil {
 		return err
 	}

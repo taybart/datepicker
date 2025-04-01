@@ -5,8 +5,9 @@ import (
 )
 
 type Calendar struct {
-	date   time.Time
-	format string
+	date        time.Time
+	format      string
+	startSunday bool
 }
 type Month []Week
 type Week [7]int
@@ -39,6 +40,9 @@ func (c *Calendar) SetOutputFormat(format string) {
 	// TODO: check if format is valid, i don't think this is possible
 	c.format = format
 }
+func (c *Calendar) SundayStart() {
+	c.startSunday = true
+}
 
 /*
  * Xetters
@@ -70,8 +74,11 @@ func (c Calendar) lastDay() int {
 
 func (c Calendar) firstWeekdayOfMonth() int {
 	weekday := time.Date(c.Year(), c.Month(), 1, 0, 0, 0, 0, time.UTC).Weekday()
+	if c.startSunday {
+		return int(weekday+6) % 7
+	}
 	// convert to monday as first of week
-	return (int(weekday) + 5) % 7
+	return int(weekday+5) % 7
 }
 
 /*
@@ -104,7 +111,6 @@ func (c *Calendar) MonthEnd() {
 	c.date = time.Date(c.Year(), c.Month(), c.lastDay(), 0, 0, 0, 0, time.UTC)
 }
 
-// TODO what is this?
 func (c Calendar) Map() Month {
 	monthMap := make(Month, 0)
 	week := Week{}
