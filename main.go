@@ -167,6 +167,9 @@ func run() error {
 
 	if m, ok := tm.(model); ok && m.selected {
 		fmt.Println(m.cal.Current())
+	} else {
+		// no date picked
+		os.Exit(1)
 	}
 	return nil
 }
