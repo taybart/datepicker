@@ -88,7 +88,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	if m.selected {
-		return m.cal.Current()
+		return "" // clear output
 	}
 
 	s := lipgloss.NewStyle().
@@ -150,14 +150,18 @@ func run() error {
 	cal := NewCalendar()
 	cal.SetOutputFormat(app.String("output"))
 
-	p := tea.NewProgram(model{
+	tm, err := tea.NewProgram(model{
 		selected: false,
 		cal:      cal,
 		keys:     Keys,
 		help:     help.New(),
-	})
-	if _, err := p.Run(); err != nil {
+	}, tea.WithOutput(os.Stderr)).Run()
+	if err != nil {
 		return err
+	}
+
+	if m, ok := tm.(model); ok && m.selected {
+		fmt.Println(m.cal.Current())
 	}
 	return nil
 }

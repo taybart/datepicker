@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -53,7 +52,8 @@ func (c *Calendar) IsToday(day int) bool {
 	return day == time.Now().Day() && c.Month() == now.Month() && c.Year() == now.Year()
 }
 func (c Calendar) Current() string {
-	return c.date.Format(fmt.Sprintf("%s\n", c.format))
+	// return c.date.Format(fmt.Sprintf("%s\n", c.format))
+	return c.date.Format(c.format)
 }
 func (c Calendar) Day() int {
 	return c.date.Day()
