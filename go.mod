@@ -7,7 +7,6 @@ require (
 	github.com/charmbracelet/bubbletea v1.2.4
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/taybart/args v0.0.1
-	golang.org/x/term v0.30.0
 )
 
 require (
