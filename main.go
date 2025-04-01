@@ -125,34 +125,31 @@ func (m model) View() string {
 			Render(prompt))
 		s.WriteString("\n")
 	}
+	s.WriteString(lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("5")).
+		Render(m.cal.MonthHeader()))
+	s.WriteString("\n")
 
 	s.WriteString(lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("5")).
-		Render(fmt.Sprintf("   %s %d", m.cal.Month(), m.cal.Year())))
+		Render(m.cal.WeekHeader()))
 	s.WriteString("\n")
-	weekHeader := "Mo Tu We Th Fr Sa Su"
-	if m.cal.startSunday {
-		weekHeader = "Su Mo Tu We Th Fr Sa"
-	}
-	s.WriteString(lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("5")).
-		Render(weekHeader))
-	s.WriteString("\n")
+
 	month := m.cal.Map()
 	for _, week := range month {
 		for k, day := range week {
-			if day == 0 {
+			if day == -1 {
 				s.WriteString("   ")
 				continue
 			}
 
 			isWeekend := k >= 5
-			focused := day == m.cal.Day()
+			focused := day+1 == m.cal.Day()
 			style := lipgloss.NewStyle()
 
-			if m.cal.IsToday(day) {
+			if m.cal.IsToday(day + 1) { // days 0 indexed
 				if focused {
 					style = style.Background(lipgloss.Color("9")).Foreground(lipgloss.Color("0"))
 				} else {
@@ -171,7 +168,7 @@ func (m model) View() string {
 					style = style.Foreground(lipgloss.Color("3"))
 				}
 			}
-			s.WriteString(style.Render(fmt.Sprintf("%2d ", day)))
+			s.WriteString(style.Render(fmt.Sprintf("%2d ", day+1))) // days 0 indexed
 		}
 
 		s.WriteString("\n")
@@ -197,6 +194,10 @@ func run() error {
 	cal := NewCalendar()
 	cal.SetOutputFormat(app.String("output"))
 	cal.SundayStart(app.Bool("sunday"))
+
+	// cal.AddDay(14)
+	// fmt.Println(cal.Current(), cal.Map(), cal.Map()[cal.weekIndex()].lastDay())
+	// return nil
 
 	// tmp fix for lipgloss not detecting color output
 	os.Setenv("CLICOLOR_FORCE", "true")

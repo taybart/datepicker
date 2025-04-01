@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -12,18 +13,22 @@ type Calendar struct {
 type Month []Week
 type Week [7]int
 
+func NewWeek() Week {
+	return Week{-1, -1, -1, -1, -1, -1, -1}
+}
+
 func (week Week) firstDay() int {
 	for _, day := range week {
-		if day != 0 {
-			return day
+		if day != -1 {
+			return day + 1
 		}
 	}
 	return 0
 }
 func (week Week) lastDay() int {
 	for i := 6; i >= 0; i-- {
-		if week[i] != 0 {
-			return week[i]
+		if week[i] != -1 {
+			return week[i] + 1
 		}
 	}
 	return 0
@@ -42,6 +47,19 @@ func (c *Calendar) SetOutputFormat(format string) {
 }
 func (c *Calendar) SundayStart(s bool) {
 	c.startSunday = s
+}
+
+/*
+ * Render
+ */
+func (c Calendar) MonthHeader() string {
+	return fmt.Sprintf("   %s %d", c.Month(), c.Year())
+}
+func (c Calendar) WeekHeader() string {
+	if c.startSunday {
+		return "Su Mo Tu We Th Fr Sa"
+	}
+	return "Mo Tu We Th Fr Sa Su"
 }
 
 /*
@@ -68,17 +86,17 @@ func (c Calendar) Month() time.Month {
 func (c Calendar) Year() int {
 	return c.date.Year()
 }
-func (c Calendar) lastDay() int {
+func (c Calendar) lastDayOfMonth() int {
 	return time.Date(c.Year(), c.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 
 func (c Calendar) firstWeekdayOfMonth() int {
 	weekday := time.Date(c.Year(), c.Month(), 1, 0, 0, 0, 0, time.UTC).Weekday()
 	if c.startSunday {
-		return int(weekday+6) % 7
+		return int(weekday)
 	}
 	// convert to monday as first of week
-	return int(weekday+5) % 7
+	return int(weekday+6) % 7
 }
 
 /*
@@ -97,32 +115,32 @@ func (c *Calendar) AddYear(amount int) {
 	c.date = c.date.AddDate(amount, 0, 0)
 }
 func (c *Calendar) WeekStart() {
-	d := c.Day() - c.Map()[c.week()].firstDay()
-	c.AddDay(-d)
+	d := c.Map()[c.weekIndex()].firstDay()
+	c.date = time.Date(c.date.Year(), c.date.Month(), d, 0, 0, 0, 0, time.UTC)
 }
 func (c *Calendar) WeekEnd() {
-	d := c.Map()[c.week()].lastDay() - c.Day()
-	c.AddDay(d)
+	d := c.Map()[c.weekIndex()].lastDay()
+	c.date = time.Date(c.date.Year(), c.date.Month(), d, 0, 0, 0, 0, time.UTC)
 }
 func (c *Calendar) MonthStart() {
 	c.date = time.Date(c.date.Year(), c.date.Month(), 1, 0, 0, 0, 0, time.UTC)
 }
 func (c *Calendar) MonthEnd() {
-	c.date = time.Date(c.Year(), c.Month(), c.lastDay(), 0, 0, 0, 0, time.UTC)
+	c.date = time.Date(c.Year(), c.Month(), c.lastDayOfMonth(), 0, 0, 0, 0, time.UTC)
 }
 
 func (c Calendar) Map() Month {
 	monthMap := make(Month, 0)
-	week := Week{}
+	week := NewWeek()
 
 	// fill weeks of the month
 	startDay := c.firstWeekdayOfMonth()
-	for day := range c.lastDay() + 1 {
+	for day := range c.lastDayOfMonth() {
 		week[startDay%7] = day
 		startDay += 1
 		if startDay%7 == 0 {
 			monthMap = append(monthMap, week)
-			week = Week{}
+			week = NewWeek()
 		}
 	}
 	// is this a 5 week month?
@@ -133,10 +151,6 @@ func (c Calendar) Map() Month {
 }
 
 // TODO fix
-func (c Calendar) week() int {
-	firstWeekday := c.firstWeekdayOfMonth()
-	if firstWeekday == 0 {
-		firstWeekday = 7
-	}
-	return (c.Day() + int(firstWeekday-2)) / 7
+func (c Calendar) weekIndex() int {
+	return (c.firstWeekdayOfMonth() + c.Day() - 1) / 7
 }

@@ -54,12 +54,12 @@ var Keys = KeyMap{
 		key.WithHelp("j/↓", "down"),
 	),
 	Left: key.NewBinding(
-		key.WithKeys("left", "h"),
-		key.WithHelp("h/←", "left"),
+		key.WithKeys("left", "h", "b"),
+		key.WithHelp("h/←/b", "left"),
 	),
 	Right: key.NewBinding(
-		key.WithKeys("right", "l"),
-		key.WithHelp("l/→", "right"),
+		key.WithKeys("right", "l", "w"),
+		key.WithHelp("l/→/w", "right"),
 	),
 	Today: key.NewBinding(
 		key.WithKeys("t"),
@@ -99,6 +99,6 @@ var Keys = KeyMap{
 	),
 	Select: key.NewBinding(
 		key.WithKeys("enter"),
-		key.WithHelp("enter", "select (copy to buffer)"),
+		key.WithHelp("enter", "select day"),
 	),
 }
