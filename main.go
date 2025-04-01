@@ -46,6 +46,8 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		return m, nil
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.Quit):
@@ -149,6 +151,9 @@ func run() error {
 
 	cal := NewCalendar()
 	cal.SetOutputFormat(app.String("output"))
+
+	// tmp fix for lipgloss not detecting color output
+	os.Setenv("CLICOLOR_FORCE", "true")
 
 	tm, err := tea.NewProgram(model{
 		selected: false,
