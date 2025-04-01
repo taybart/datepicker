@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -187,14 +188,15 @@ func (m model) View() string {
 
 func run() error {
 	if err := app.Parse(); err != nil {
+		if errors.Is(err, args.ErrUsageRequested) {
+			return nil
+		}
 		return err
 	}
 
 	cal := NewCalendar()
 	cal.SetOutputFormat(app.String("output"))
-	if app.True("sunday") {
-		cal.SundayStart()
-	}
+	cal.SundayStart(app.Bool("sunday"))
 
 	// tmp fix for lipgloss not detecting color output
 	os.Setenv("CLICOLOR_FORCE", "true")
@@ -217,16 +219,14 @@ func run() error {
 
 	if m, ok := tm.(model); ok && m.selected {
 		fmt.Println(m.cal.Current())
-	} else {
-		// no date picked
-		os.Exit(1)
+		return nil
 	}
-	return nil
+	return errors.New("no date picked")
 }
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Println(err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }

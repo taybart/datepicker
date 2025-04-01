@@ -40,8 +40,8 @@ func (c *Calendar) SetOutputFormat(format string) {
 	// TODO: check if format is valid, i don't think this is possible
 	c.format = format
 }
-func (c *Calendar) SundayStart() {
-	c.startSunday = true
+func (c *Calendar) SundayStart(s bool) {
+	c.startSunday = s
 }
 
 /*
@@ -87,14 +87,14 @@ func (c Calendar) firstWeekdayOfMonth() int {
 func (c *Calendar) SetDate(newDate time.Time) {
 	c.date = newDate
 }
-func (c *Calendar) AddDay(ammount int) {
-	c.date = c.date.AddDate(0, 0, ammount)
+func (c *Calendar) AddDay(amount int) {
+	c.date = c.date.AddDate(0, 0, amount)
 }
-func (c *Calendar) AddMonth(ammount int) {
-	c.date = c.date.AddDate(0, 0, ammount)
+func (c *Calendar) AddMonth(amount int) {
+	c.date = c.date.AddDate(0, amount, 0)
 }
-func (c *Calendar) AddYear(ammount int) {
-	c.date = c.date.AddDate(0, 0, ammount)
+func (c *Calendar) AddYear(amount int) {
+	c.date = c.date.AddDate(amount, 0, 0)
 }
 func (c *Calendar) WeekStart() {
 	d := c.Day() - c.Map()[c.week()].firstDay()
