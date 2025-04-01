@@ -1,4 +1,4 @@
-module tui-datepicker
+module datepicker
 
 go 1.23.3
 
