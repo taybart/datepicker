@@ -20,6 +20,7 @@ type KeyMap struct {
 	MonthNext  key.Binding
 	YearPrev   key.Binding
 	YearNext   key.Binding
+	StartRange key.Binding
 	Select     key.Binding
 }
 
@@ -96,6 +97,10 @@ var Keys = KeyMap{
 	YearNext: key.NewBinding(
 		key.WithKeys("N"),
 		key.WithHelp("N", "next year"),
+	),
+	StartRange: key.NewBinding(
+		key.WithKeys(" "),
+		key.WithHelp("space", "start range selection"),
 	),
 	Select: key.NewBinding(
 		key.WithKeys("enter"),

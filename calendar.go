@@ -73,9 +73,14 @@ func (c *Calendar) IsToday(day int) bool {
 	now := time.Now()
 	return day == time.Now().Day() && c.Month() == now.Month() && c.Year() == now.Year()
 }
-func (c Calendar) Current() string {
-	// return c.date.Format(fmt.Sprintf("%s\n", c.format))
-	return c.date.Format(c.format)
+func (c *Calendar) InMonth(date time.Time) bool {
+	return c.Month() == date.Month() && c.Year() == date.Year()
+}
+func (c Calendar) Current() time.Time {
+	return c.date
+}
+func (c Calendar) Format(date time.Time) string {
+	return date.Format(c.format)
 }
 func (c Calendar) Day() int {
 	return c.date.Day()

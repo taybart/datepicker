@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -46,11 +47,12 @@ var (
 )
 
 type model struct {
-	selected bool
-	prompt   string
-	cal      Calendar
-	keys     KeyMap
-	help     help.Model
+	selected   bool
+	rangeStart time.Time
+	prompt     string
+	cal        Calendar
+	keys       KeyMap
+	help       help.Model
 }
 
 func (m model) Init() tea.Cmd {
@@ -64,7 +66,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.Quit):
-			return m, tea.Quit
+			if !m.rangeStart.IsZero() { // stop selection first
+				m.rangeStart = time.Time{}
+			} else {
+				return m, tea.Quit
+			}
 		case key.Matches(msg, m.keys.Help):
 			m.help.ShowAll = !m.help.ShowAll
 		case key.Matches(msg, m.keys.Today):
@@ -93,6 +99,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cal.AddYear(-1)
 		case key.Matches(msg, m.keys.YearNext):
 			m.cal.AddYear(1)
+		case key.Matches(msg, m.keys.StartRange):
+			m.rangeStart = m.cal.date
 		case key.Matches(msg, m.keys.Select):
 			m.selected = true
 			return m, tea.Quit
@@ -138,6 +146,8 @@ func (m model) View() string {
 	s.WriteString("\n")
 
 	month := m.cal.Map()
+	behind := false
+	selecting := false
 	for _, week := range month {
 		for k, day := range week {
 			if day == -1 {
@@ -145,38 +155,65 @@ func (m model) View() string {
 				continue
 			}
 
+			dateDay := day + 1 // 0 indexed days
 			isWeekend := k >= 5
-			focused := day+1 == m.cal.Day()
+			focused := dateDay == m.cal.Day()
 			style := lipgloss.NewStyle()
 
-			if m.cal.IsToday(day + 1) { // days 0 indexed
-				if focused {
+			if !m.rangeStart.IsZero() && m.rangeStart.Day() == dateDay { //&& m.cal.InMonth(m.rangeStart) {
+				selecting = true
+			}
+			if selecting {
+				style = style.Background(lipgloss.Color("4")).Foreground(lipgloss.Color("0"))
+			}
+			if m.cal.IsToday(dateDay) {
+				style = style.Foreground(lipgloss.Color("9"))
+				if !selecting && focused {
 					style = style.Background(lipgloss.Color("9")).Foreground(lipgloss.Color("0"))
-				} else {
-					style = style.Foreground(lipgloss.Color("9"))
 				}
 			} else if isWeekend {
-				if focused {
+				style = style.Foreground(lipgloss.Color("4"))
+				if !selecting && focused {
 					style = style.Background(lipgloss.Color("4")).Foreground(lipgloss.Color("0"))
-				} else {
-					style = style.Foreground(lipgloss.Color("4"))
+				}
+				if selecting {
+					style = style.Foreground(lipgloss.Color("15"))
 				}
 			} else {
-				if focused {
+				style = style.Foreground(lipgloss.Color("3"))
+				if !selecting && focused {
 					style = style.Background(lipgloss.Color("3")).Foreground(lipgloss.Color("0"))
-				} else {
-					style = style.Foreground(lipgloss.Color("3"))
 				}
 			}
-			s.WriteString(style.Render(fmt.Sprintf("%2d ", day+1))) // days 0 indexed
+
+			if !m.rangeStart.IsZero() {
+				if m.rangeStart.Day() == dateDay && m.cal.InMonth(m.rangeStart) { // at rangeStart
+					selecting = true
+					if focused { // at the range start
+						selecting = false
+					}
+					if behind { // done selecting
+						selecting = false
+					}
+				}
+				if focused {
+					if dateDay < m.rangeStart.Day() { // before selected start
+						behind = true
+						selecting = true
+					}
+					if dateDay > m.rangeStart.Day() { // after selected start
+						selecting = false
+					}
+				}
+			}
+			s.WriteString(style.Render(fmt.Sprintf("%2d ", dateDay)))
 		}
 
 		s.WriteString("\n")
 	}
 
-	if len(month) == 4 {
-		s.WriteString("\n\n")
-	} else if len(month) == 5 {
+	s.WriteString("\n")
+	if len(month) == 4 { // padding for shorter months
 		s.WriteString("\n")
 	}
 	s.WriteString(m.help.View(m.keys))
@@ -219,7 +256,15 @@ func run() error {
 	}
 
 	if m, ok := tm.(model); ok && m.selected {
-		fmt.Println(m.cal.Current())
+		if !m.rangeStart.IsZero() {
+			if m.rangeStart.After(m.cal.Current()) {
+				fmt.Println(m.cal.Format(m.cal.Current()), m.cal.Format(m.rangeStart))
+			} else {
+				fmt.Println(m.cal.Format(m.rangeStart), m.cal.Format(m.cal.Current()))
+			}
+			return nil
+		}
+		fmt.Println(m.cal.Format(m.cal.Current()))
 		return nil
 	}
 	return errors.New("no date picked")
