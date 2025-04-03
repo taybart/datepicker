@@ -1,4 +1,4 @@
-module datepicker
+module github.com/taybart/datepicker
 
 go 1.23.3
 
