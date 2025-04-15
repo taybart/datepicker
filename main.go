@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	lg "github.com/charmbracelet/lipgloss"
 	"github.com/taybart/args"
 )
 
@@ -53,6 +53,8 @@ type model struct {
 	cal        Calendar
 	keys       KeyMap
 	help       help.Model
+	width      int
+	height     int
 }
 
 func (m model) Init() tea.Cmd {
@@ -62,6 +64,8 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 		return m, nil
 	case tea.KeyMsg:
 		switch {
@@ -130,32 +134,28 @@ func (m model) View() string {
 			)
 
 		}
-		s.WriteString(lipgloss.NewStyle().
+		s.WriteString(lg.NewStyle().
 			Bold(true).
 			Underline(true).
-			Foreground(lipgloss.Color("10")).
+			Foreground(lg.Color("10")).
 			Render(prompt))
 		s.WriteString("\n")
 
 	}
 
-	s.WriteString(lipgloss.NewStyle().
+	s.WriteString(lg.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("5")).
+		Foreground(lg.Color("5")).
 		Render(m.cal.MonthHeader()))
 	s.WriteString("\n")
 
-	s.WriteString(lipgloss.NewStyle().
+	s.WriteString(lg.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("5")).
+		Foreground(lg.Color("5")).
 		Render(m.cal.WeekHeader()))
 	s.WriteString("\n")
 
 	month := m.cal.Map()
-	behind := false
-	after := false
-	selecting := false
-	oneMore := false
 	for _, week := range month {
 		for k, day := range week {
 			if day == -1 {
@@ -163,79 +163,123 @@ func (m model) View() string {
 				continue
 			}
 
+			// Basic date information
 			dateDay := day + 1 // 0 indexed days
 			isWeekend := k >= 5
-			focused := dateDay == m.cal.Day()
 			currentDate := time.Date(m.cal.Year(), m.cal.Month(), dateDay, 0, 0, 0, 0, time.UTC)
 
-			// there is a range started
+			// Focus information
+			isFocused := dateDay == m.cal.Day()
+			focusedDate := time.Date(m.cal.Year(), m.cal.Month(), m.cal.Day(), 0, 0, 0, 0, time.UTC)
+
+			// Range selection logic
+			isSelected := false
+			isRangeEndpoint := false
+
+			// Only process range selection if a range start exists
 			if !m.rangeStart.IsZero() {
-				// the date we are checking is the start of selection
-				if currentDate.Equal(m.rangeStart) {
-					// start selecting at the range select
-					selecting = true
-					// we actually want to stop selecting since the day we
-					// have selected is behind the selection start
-					if behind {
-						selecting = false
-						behind = false
-						oneMore = true // we need to show all the way up to the range start day
-					}
-					// we are focused on the range start, no need to select any more dates
-					if focused {
-						selecting = false
-					}
-					// we are at the focused day and our selection starts after this
-				} else if focused && currentDate.Before(m.rangeStart) {
-					behind = true // we need to stop when we hit the start of range selection
-					selecting = true
-					// we are at the focused day and our selection starts before this
-				} else if focused && currentDate.After(m.rangeStart) {
-					after = true
-					selecting = false
-					// we are in a month in the future and not after the focused day
-					// so start selecting up until then
-				} else if !after && currentDate.Month()-m.rangeStart.Month() > 0 {
-					selecting = true
+				isRangeStartDay := currentDate.Equal(m.rangeStart)
+
+				// Case 1: Selecting forward (focus to range start)
+				if focusedDate.Before(m.rangeStart) {
+					// Select days between focus and range start
+					isInForwardRange := currentDate.After(focusedDate) && currentDate.Before(m.rangeStart)
+					isSelected = isFocused || isInForwardRange
+					isRangeEndpoint = isRangeStartDay
+					// Case 2: Selecting backward (range start to focus)
+				} else if focusedDate.After(m.rangeStart) {
+					// Select days between range start and focus
+					isInBackwardRange := currentDate.After(m.rangeStart) && currentDate.Before(focusedDate)
+					isSelected = isRangeStartDay || isInBackwardRange
+					// Case 3: Focus is on range start
+				} else if focusedDate.Equal(m.rangeStart) {
+					// Only select the range start if it's not focused
+					isSelected = isRangeStartDay && !isFocused
 				}
+
+				// Handle multi-month selection
+				if !focusedDate.Equal(m.rangeStart) &&
+					currentDate.Month() != focusedDate.Month() &&
+					currentDate.Month() != m.rangeStart.Month() {
+
+					// For multi-month forward selection
+					if focusedDate.Before(m.rangeStart) &&
+						currentDate.After(focusedDate) &&
+						currentDate.Before(m.rangeStart) {
+						isSelected = true
+						// For multi-month backward selection
+					} else if focusedDate.After(m.rangeStart) &&
+						currentDate.After(m.rangeStart) &&
+						currentDate.Before(focusedDate) {
+						isSelected = true
+					}
+				}
+			}
+			// Styling logic
+			style := lg.NewStyle()
+
+			// Apply selection styling
+			if isSelected || isRangeEndpoint {
+				style = style.Background(lg.Color("4")).Foreground(lg.Color("0"))
 			}
 
-			style := lipgloss.NewStyle()
-			if selecting || oneMore {
-				style = style.Background(lipgloss.Color("4")).Foreground(lipgloss.Color("0"))
-				oneMore = false
-			}
+			// Apply other styling based on day type
 			if m.cal.IsToday(dateDay) {
-				style = style.Foreground(lipgloss.Color("9"))
-				if !selecting && focused {
-					style = style.Background(lipgloss.Color("9")).Foreground(lipgloss.Color("0"))
+				style = style.Foreground(lg.Color("9"))
+				if !isSelected && isFocused {
+					style = style.Background(lg.Color("9")).Foreground(lg.Color("0"))
 				}
 			} else if isWeekend {
-				style = style.Foreground(lipgloss.Color("4"))
-				if !selecting && focused {
-					style = style.Background(lipgloss.Color("4")).Foreground(lipgloss.Color("0"))
+				style = style.Foreground(lg.Color("4"))
+				if !isSelected && isFocused {
+					style = style.Background(lg.Color("4")).Foreground(lg.Color("0"))
 				}
-				if selecting {
-					style = style.Foreground(lipgloss.Color("15"))
+				if isSelected {
+					style = style.Foreground(lg.Color("15"))
 				}
 			} else {
-				style = style.Foreground(lipgloss.Color("3"))
-				if !selecting && focused {
-					style = style.Background(lipgloss.Color("3")).Foreground(lipgloss.Color("0"))
+				style = style.Foreground(lg.Color("3"))
+				if !isSelected && isFocused {
+					style = style.Background(lg.Color("3")).Foreground(lg.Color("0"))
 				}
 			}
 
 			s.WriteString(style.Render(fmt.Sprintf("%2d ", dateDay)))
 		}
-
 		s.WriteString("\n")
 	}
 
 	s.WriteString("\n")
-	if len(month) == 4 { // padding if month fits into 4 weeks exactly
+	// pad one more line if month fits into 4 weeks exactly
+	if len(month) == 4 {
 		s.WriteString("\n")
 	}
+	// show help keys
 	s.WriteString(m.help.View(m.keys))
+
+	if app.True("full") {
+		calendar := strings.Split(s.String(), "\n")
+
+		maxWidth := 20
+		// Create a centered style
+		centered := lg.NewStyle().
+			Width(maxWidth).
+			PaddingLeft((m.width - maxWidth) / 2)
+
+		// Apply the centered style to each line
+		var s strings.Builder
+		for _, line := range calendar {
+			s.WriteString(centered.Render(line))
+			s.WriteString("\n")
+		}
+
+		// Position vertically using padding
+		verticalPadding := (m.height - len(calendar)) / 2
+		if verticalPadding > 0 {
+			return strings.Repeat("\n", verticalPadding) + s.String()
+		}
+		return s.String()
+	}
 	return s.String()
 }
 
@@ -251,7 +295,7 @@ func run() error {
 	cal.SetOutputFormat(app.String("output"))
 	cal.SundayStart(app.Bool("sunday"))
 
-	// tmp fix for lipgloss not detecting color output
+	// tmp (but really permanent) fix for lg not detecting color output
 	os.Setenv("CLICOLOR_FORCE", "true")
 
 	opts := []tea.ProgramOption{tea.WithOutput(os.Stderr)}

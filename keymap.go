@@ -41,7 +41,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 var Keys = KeyMap{
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
-		key.WithHelp("q/esc/ctrl-c", "quit"),
+		key.WithHelp("q/esc", "quit"),
 	),
 	Cancel: key.NewBinding(
 		key.WithKeys("esc"),
