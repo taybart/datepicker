@@ -21,7 +21,6 @@ var (
 		Author:  "taybart",
 		About:   "TUI date picker",
 		Args: map[string]*args.Arg{
-			// TODO: this
 			"sunday": {
 				Short:   "s",
 				Help:    "Start week on sunday",
@@ -47,6 +46,7 @@ var (
 )
 
 type model struct {
+	quit       bool
 	selected   bool
 	rangeStart time.Time
 	prompt     string
@@ -66,9 +66,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.Quit):
+			m.quit = true
+			return m, tea.Quit
+		case key.Matches(msg, m.keys.Cancel):
 			if !m.rangeStart.IsZero() { // stop selection first
 				m.rangeStart = time.Time{}
 			} else {
+				m.quit = true
 				return m, tea.Quit
 			}
 		case key.Matches(msg, m.keys.Help):
@@ -110,7 +114,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	if m.selected {
+	if m.selected || m.quit {
 		return "" // clear output
 	}
 	var s strings.Builder
@@ -132,7 +136,9 @@ func (m model) View() string {
 			Foreground(lipgloss.Color("10")).
 			Render(prompt))
 		s.WriteString("\n")
+
 	}
+
 	s.WriteString(lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("5")).
@@ -147,7 +153,9 @@ func (m model) View() string {
 
 	month := m.cal.Map()
 	behind := false
+	after := false
 	selecting := false
+	oneMore := false
 	for _, week := range month {
 		for k, day := range week {
 			if day == -1 {
@@ -158,13 +166,44 @@ func (m model) View() string {
 			dateDay := day + 1 // 0 indexed days
 			isWeekend := k >= 5
 			focused := dateDay == m.cal.Day()
-			style := lipgloss.NewStyle()
+			currentDate := time.Date(m.cal.Year(), m.cal.Month(), dateDay, 0, 0, 0, 0, time.UTC)
 
-			if !m.rangeStart.IsZero() && m.rangeStart.Day() == dateDay { //&& m.cal.InMonth(m.rangeStart) {
-				selecting = true
+			// there is a range started
+			if !m.rangeStart.IsZero() {
+				// the date we are checking is the start of selection
+				if currentDate.Equal(m.rangeStart) {
+					// start selecting at the range select
+					selecting = true
+					// we actually want to stop selecting since the day we
+					// have selected is behind the selection start
+					if behind {
+						selecting = false
+						behind = false
+						oneMore = true // we need to show all the way up to the range start day
+					}
+					// we are focused on the range start, no need to select any more dates
+					if focused {
+						selecting = false
+					}
+					// we are at the focused day and our selection starts after this
+				} else if focused && currentDate.Before(m.rangeStart) {
+					behind = true // we need to stop when we hit the start of range selection
+					selecting = true
+					// we are at the focused day and our selection starts before this
+				} else if focused && currentDate.After(m.rangeStart) {
+					after = true
+					selecting = false
+					// we are in a month in the future and not after the focused day
+					// so start selecting up until then
+				} else if !after && currentDate.Month()-m.rangeStart.Month() > 0 {
+					selecting = true
+				}
 			}
-			if selecting {
+
+			style := lipgloss.NewStyle()
+			if selecting || oneMore {
 				style = style.Background(lipgloss.Color("4")).Foreground(lipgloss.Color("0"))
+				oneMore = false
 			}
 			if m.cal.IsToday(dateDay) {
 				style = style.Foreground(lipgloss.Color("9"))
@@ -186,26 +225,6 @@ func (m model) View() string {
 				}
 			}
 
-			if !m.rangeStart.IsZero() {
-				if m.rangeStart.Day() == dateDay && m.cal.InMonth(m.rangeStart) { // at rangeStart
-					selecting = true
-					if focused { // at the range start
-						selecting = false
-					}
-					if behind { // done selecting
-						selecting = false
-					}
-				}
-				if focused {
-					if dateDay < m.rangeStart.Day() { // before selected start
-						behind = true
-						selecting = true
-					}
-					if dateDay > m.rangeStart.Day() { // after selected start
-						selecting = false
-					}
-				}
-			}
 			s.WriteString(style.Render(fmt.Sprintf("%2d ", dateDay)))
 		}
 
@@ -213,7 +232,7 @@ func (m model) View() string {
 	}
 
 	s.WriteString("\n")
-	if len(month) == 4 { // padding for shorter months
+	if len(month) == 4 { // padding if month fits into 4 weeks exactly
 		s.WriteString("\n")
 	}
 	s.WriteString(m.help.View(m.keys))
@@ -231,10 +250,6 @@ func run() error {
 	cal := NewCalendar()
 	cal.SetOutputFormat(app.String("output"))
 	cal.SundayStart(app.Bool("sunday"))
-
-	// cal.AddDay(14)
-	// fmt.Println(cal.Current(), cal.Map(), cal.Map()[cal.weekIndex()].lastDay())
-	// return nil
 
 	// tmp fix for lipgloss not detecting color output
 	os.Setenv("CLICOLOR_FORCE", "true")

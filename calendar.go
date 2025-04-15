@@ -35,8 +35,10 @@ func (week Week) lastDay() int {
 }
 
 func NewCalendar() Calendar {
+	now := time.Now()
+	date := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	return Calendar{
-		date:   time.Now(),
+		date:   date,
 		format: "2006-01-02",
 	}
 }
@@ -66,7 +68,8 @@ func (c Calendar) WeekHeader() string {
  * Xetters
  */
 func (c *Calendar) Today() time.Time {
-	c.date = time.Now()
+	now := time.Now()
+	c.date = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	return c.date
 }
 func (c *Calendar) IsToday(day int) bool {

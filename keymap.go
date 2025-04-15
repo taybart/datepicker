@@ -6,6 +6,7 @@ import (
 
 type KeyMap struct {
 	Quit       key.Binding
+	Cancel     key.Binding
 	Help       key.Binding
 	Up         key.Binding
 	Down       key.Binding
@@ -39,8 +40,12 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 
 var Keys = KeyMap{
 	Quit: key.NewBinding(
-		key.WithKeys("q", "esc", "ctrl+c"),
+		key.WithKeys("q", "ctrl+c"),
 		key.WithHelp("q/esc/ctrl-c", "quit"),
+	),
+	Cancel: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "cancel"),
 	),
 	Help: key.NewBinding(
 		key.WithKeys("?"),
